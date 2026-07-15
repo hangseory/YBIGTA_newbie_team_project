@@ -9,35 +9,59 @@
             font-family: Arial, sans-serif;
             margin: 20px;
             text-align: center;
+            background-color:#f5f5f8;
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
             border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.253);
+            background-color: lightblue;
         }
         h1 {
             color: #333;
         }
+        h2 {
+        text-align: left; 
+        padding-left: 17%; 
+        margin-bottom: 0px;        }
         form {
-            margin: 20px 0;
+            margin-top: 7px;
+            margin-bottom: 20px;
         }
         input {
-            padding: 10px;
+            padding: 12px;
             margin: 5px 0;
-            width: 80%;
+            width: 65%;
             font-size: 16px;
+            border-radius: 12px;
+            outline: none; 
+            border: none;
+            background-color: #F8F8FF; /* 클릭 시 배경색을 약간 다르게 변경 */
+
+        }
+        input::placeholder {
+        color: #aaa;
+        font-style: italic;
         }
         button {
             padding: 10px 20px;
             margin: 10px;
-            font-size: 16px;
+            font-size: 20px;
             cursor: pointer;
+            border-radius: 12px;
+            background-color: #8d8a78;
+            color: white;
+            border: none;
+            }
+        
+        button:active {
+        transform: scale(0.95);
         }
         .section {
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
     </style>
 </head>
@@ -180,3 +204,4 @@
     </script>
 </body>
 </html>
+

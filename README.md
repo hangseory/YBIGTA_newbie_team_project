@@ -1,125 +1,53 @@
-# YBIGTA Newbie Team Project 협업 방법
+# 경복궁 리뷰 크롤링
 
-저장소:
+경복궁 리뷰를 여러 사이트에서 수집하는 프로젝트입니다.
 
-```text
-https://github.com/hanseory/YBIGTA_newbie_team_project
-```
+## 데이터
 
-## 1. 처음 한 번만
+| 사이트 | 링크 | 파일 | 리뷰 개수 |
+|---|---|---|---:|
+| 카카오맵 | https://place.map.kakao.com/18619553 | `reviews_kakao.csv` | 500개 |
+| [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
+| [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
 
-```bash
-git clone https://github.com/hanseory/YBIGTA_newbie_team_project.git
-cd YBIGTA_newbie_team_project
-```
+각 CSV 파일은 다음 컬럼을 포함합니다.
 
-## 2. 작업 시작할 때
+| 컬럼 | 내용 |
+|---|---|
+| `rating` | 별점 |
+| `date` | 작성 날짜 |
+| `review` | 리뷰 내용 |
 
-항상 최신 `main`을 받은 뒤 자기 브랜치를 만든다.
-
-```bash
-git switch main
-git pull origin main
-git switch -c honggildong-data-cleaning
-```
-
-브랜치 이름은 알아보기 쉽게 정하면 된다.
+결과 파일은 `database` 폴더에 저장됩니다.
 
 ```text
-honggildong-data-cleaning
-honggildong-model
-honggildong-readme
+database/
+├── reviews_kakao.csv
+└── reviews_[사이트명].csv
 ```
 
-현재 브랜치 확인:
+## 설치
 
 ```bash
-git branch
+python -m pip install -r requirements.txt
 ```
 
-`*`가 붙은 브랜치가 현재 브랜치다.
+## 실행
 
-## 3. 작업 후 커밋
+카카오맵 크롤러:
 
 ```bash
-git status
-git add .
-git commit -m "데이터 정리 코드 추가"
+python -m review_analysis.crawling.main -o database -c kakao
 ```
 
-## 4. push 전에 최신 main 반영
-
-다른 팀원의 코드가 먼저 합쳐졌을 수 있으므로 바로 push하지 않는다.
+전체 크롤러:
 
 ```bash
-git fetch origin
-git merge origin/main
+python -m review_analysis.crawling.main -o database --all
 ```
 
-충돌이 없다면 자기 브랜치를 GitHub에 올린다.
+## 타입 검사
 
 ```bash
-git push -u origin honggildong-data-cleaning
-```
-
-두 번째 push부터는:
-
-```bash
-git push
-```
-
-## 5. GitHub에서 합치기
-
-`main`에 직접 push하지 말고 Pull Request를 만든다.
-
-```text
-GitHub 저장소
-→ Pull requests
-→ New pull request
-→ base: main
-→ compare: honggildong-data-cleaning
-→ Create pull request
-```
-
-Pull Request에서 팀원들과 의견을 조율하고, 수정이 필요하면 같은 브랜치에서 다시:
-
-```bash
-git add .
-git commit -m "리뷰 의견 반영"
-git push
-```
-
-검토가 끝나면 GitHub에서 `Merge pull request`를 누른다.
-
-## 6. merge가 끝난 후
-
-```bash
-git switch main
-git pull origin main
-git branch -d honggildong-data-cleaning
-```
-
-## 전체 순서
-
-```bash
-git switch main
-git pull origin main
-git switch -c honggildong-data-cleaning
-
-# 파일 작업
-
-git add .
-git commit -m "데이터 정리 코드 추가"
-
-git fetch origin
-git merge origin/main
-git push -u origin honggildong-data-cleaning
-```
-
-그다음 GitHub에서:
-
-```text
-Pull Request 생성
-→ 팀원들과 검토
-→ Merge
+python -m mypy review_analysis utils
 ```

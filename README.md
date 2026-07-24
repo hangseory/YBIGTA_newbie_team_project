@@ -7,8 +7,9 @@
 | 사이트 | 링크 | 파일 | 리뷰 개수 |
 |---|---|---|---:|
 | 카카오맵 | https://place.map.kakao.com/18619553 | `reviews_kakao.csv` | 500개 |
-| [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
-| [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
+| 트립어드바이저 | https://www.tripadvisor.co.kr/Attraction_Review-g294197-d324888-Reviews-Gyeongbokgung_Palace-Seoul.html | `reviews_트립어드바이저.csv` | 500개 |
+| 구글맵스 | https://www.google.co.kr/maps/place/%EA%B2%BD%EB%B3%B5%EA%B6%81/data=!4m10!1m2!2m1!1z6rK967O16raB!3m6!1s0x357ca2c74aeddea1:0x8b3046532cc715f6!8m2!3d37.579617!4d126.977041!15sCgnqsr3rs7XqtoFaCyIJ6rK967O16raBkgERY3VsdHVyYWxfbGFuZG1hcmvgAQA!16zL20vMDJ2M3Q2?entry=ttu&g_ep=EgoyMDI2MDcyMS4wIKXMDSoASAFQAw%3D%3D | `reviews_GoogleMaps.csv` | 500개 |
+
 
 각 CSV 파일은 다음 컬럼을 포함합니다.
 
@@ -23,7 +24,8 @@
 ```text
 database/
 ├── reviews_kakao.csv
-└── reviews_[사이트명].csv
+├── reviews_트립어드바이저.csv
+└── reviews_GoogleMaps.csv
 ```
 
 ## 설치
@@ -38,6 +40,16 @@ python -m pip install -r requirements.txt
 
 ```bash
 python -m review_analysis.crawling.main -o database -c kakao
+```
+트립어드바이저 크롤러:
+
+```bash
+python -m review_analysis.crawling.main -o database -c tripadvisor
+```
+구글맵스 크롤러:
+
+```bash
+python -m review_analysis.crawling.main -o database -c googlemaps
 ```
 
 전체 크롤러:

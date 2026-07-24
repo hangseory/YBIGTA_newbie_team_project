@@ -7,6 +7,7 @@
 | 사이트 | 링크 | 파일 | 리뷰 개수 |
 |---|---|---|---:|
 | 카카오맵 | https://place.map.kakao.com/18619553 | `reviews_kakao.csv` | 500개 |
+| 트립어드바이저 | https://www.tripadvisor.co.kr/Attraction_Review-g294197-d324888-Reviews-Gyeongbokgung_Palace-Seoul.html | `reviews_트립어드바이저.csv` | 500개 |
 | [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
 | [사이트명] | [링크] | `reviews_[사이트명].csv` | [개수] |
 
@@ -23,6 +24,7 @@
 ```text
 database/
 ├── reviews_kakao.csv
+├── reviews_트립어드바이저.csv
 └── reviews_[사이트명].csv
 ```
 
@@ -38,6 +40,11 @@ python -m pip install -r requirements.txt
 
 ```bash
 python -m review_analysis.crawling.main -o database -c kakao
+```
+트립어드바이저 크롤러:
+
+```bash
+python -m review_analysis.crawling.main -o database -c tripadvisor
 ```
 
 전체 크롤러:

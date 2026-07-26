@@ -64,6 +64,7 @@ class KakaoCrawler(BaseCrawler):
 
         time.sleep(5)
         
+        
         review_items = self.driver.find_elements(
             By.CSS_SELECTOR,
             "div.area_review",

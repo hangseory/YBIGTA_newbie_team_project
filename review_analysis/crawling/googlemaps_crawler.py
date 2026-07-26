@@ -21,13 +21,7 @@ class GoogleMapsCrawler(BaseCrawler):
         super().__init__(output_dir)
          #구글맵 경복궁 리뷰 URL
         self.base_url = (
-            "https://www.google.com/maps/place/%EA%B2%BD%EB%B3%B5%EA%B6%81/d"
-            "ata=!4m10!1m2!2m1!1z6rK967O16raB!3m6!1s0x357ca2c74aeddea1:0x8b30"
-            "46532cc715f6!8m2!3d37.579617!4d126.977041!15sCgnqsr3rs7XqtoFaCy"
-            "IJ6rK967O16raBkgERY3VsdHVyYWxfbGFuZG1hcmuaAURDaTlEUVVsUlFVTnZaR"
-            "U5vZEhsalJqbHZUMnhXZFdNd2R6QlRSbXhYVjFWak1tTnViRFJXTUVwNFdrVXhT"
-            "Rm96WXhBQuABAPoBBAgAEBk!16zL20vMDJ2M3Q2?entry=ttu&g_ep=EgoyMDI2"
-            "MDcyMC4wIKXMDSoASAFQAw%3D%3D"
+            "https://www.google.com/maps/search/%EA%B2%BD%EB%B3%B5%EA%B6%81?entry=ttu&g_ep=EgoyMDI2MDcyMi4wIKXMDSoASAFQAw%3D%3D"
         )
 
         self.reviews_data: list[dict[str, str]] = []    
@@ -103,6 +97,16 @@ class GoogleMapsCrawler(BaseCrawler):
                         continue # 이미 담은 리뷰면 패스
                     
                     seen_reviews.add(review_id) #리뷰 ID 저장소에 추가
+
+                    try:
+                        # block 내부에 '자세히 보기' 또는 '더보기' 텍스트를 가진 버튼 요소 탐색
+                        more_btn = block.find_element(By.XPATH, ".//button[contains(text(), '자세히 보기') or contains(@aria-label, '자세히 보기') or contains(text(), '더보기')]")
+                        # 일반 click()은 화면 가림 현상으로 에러가 날 수 있어 자바스크립트로 강제 클릭
+                        self.driver.execute_script("arguments[0].click();", more_btn)
+                        time.sleep(0.3)  # 글이 펼쳐져서 렌더링될 때까지 아주 짧게 대기
+                    except Exception:
+                        pass # 버튼이 없으면(이미 전체 내용이 다 보이는 짧은 리뷰면) 무시하고 넘어감
+                    # =====================================================================
 
                     # 본문 내용 추출(본문 코드:'wiI7pd')
                     try:

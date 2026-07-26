@@ -1,3 +1,4 @@
+import re
 import csv
 import os
 import time
@@ -6,9 +7,25 @@ from typing import Dict, List, Optional
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
 
 from review_analysis.crawling.base_crawler import BaseCrawler
 
+def remove_emoji(text: str) -> str:
+    """문자열에서 이모지를 제거한다."""
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F1E6-\U0001F1FF"
+        "\U0001F300-\U0001FAFF"
+        "\u2600-\u26FF"
+        "\u2700-\u27BF"
+        "]",
+        flags=re.UNICODE,
+    )
+
+    cleaned = emoji_pattern.sub("", text)
+    return cleaned.replace("\ufe0f", "").replace("\u200d", "").strip()
 
 class KakaoCrawler(BaseCrawler):
     """카카오맵에서 경복궁 리뷰를 수집하는 크롤러."""
@@ -78,10 +95,17 @@ class KakaoCrawler(BaseCrawler):
 
             rating = rating_elements[1].get_attribute("textContent")
 
+            review_text = remove_emoji(
+                review_elements[0].text
+            )
+
+            if not review_text:
+                continue
+
             self.reviews.append({
                 "rating": rating.strip() if rating else "",
                 "date": date_elements[0].text.strip(),
-                "review": review_elements[0].text.strip(),
+                "review": review_text
             })
 
         

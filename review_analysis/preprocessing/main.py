@@ -2,14 +2,17 @@ import os
 import glob
 from argparse import ArgumentParser
 from typing import Dict, Type
-from review_analysis.preprocessing.base_processor import BaseDataProcessor
-from review_analysis.preprocessing.example_processor import ExampleProcessor
-
+from base_processor import BaseDataProcessor
+from googlemaps_processor import GoogleMapsProcessor
+from kakao_processor import KakaoMapProcessor
+from tripadvisor_processor import TripAdvisorProcessor
 
 # 모든 preprocessing 클래스를 예시 형식으로 적어주세요. 
 # key는 "reviews_사이트이름"으로, value는 해당 처리를 위한 클래스
 PREPROCESS_CLASSES: Dict[str, Type[BaseDataProcessor]] = {
-    "reviews_example": ExampleProcessor,
+    "reviews_GoogleMaps": GoogleMapsProcessor,
+    "reviews_kakao": KakaoMapProcessor,
+    "reviews_트립어드바이저": TripAdvisorProcessor,
     # key는 크롤링한 csv파일 이름으로 적어주세요! ex. reviews_naver.csv -> reviews_naver
 }
 
@@ -39,4 +42,5 @@ if __name__ == "__main__":
                 preprocessor = preprocessor_class(csv_file, args.output_dir)
                 preprocessor.preprocess()
                 preprocessor.feature_engineering()
+                preprocessor.vectorize_text()      # 텍스트 벡터화 파일 저장위해 추가
                 preprocessor.save_to_database()

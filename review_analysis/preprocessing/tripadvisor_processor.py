@@ -47,10 +47,14 @@ class TripAdvisorProcessor(BaseDataProcessor):
         # 4. 별점 전처리 및 결측치 처리 (숫자형태 데이터 평균 반올림 적용)
         if 'rating' in self.df.columns:
             self.df['rating'] = pd.to_numeric(self.df['rating'], errors='coerce')
+            # 이상치 처리: 1~5점 범위 벗어난 값은 결측 처리
+            self.df.loc[
+                (self.df['rating'] < 1) | (self.df['rating'] > 5), 'rating'
+            ] = pd.NA
             mean_rating = self.df['rating'].mean()
             fill_value = round(mean_rating) if not pd.isna(mean_rating) else 0
             self.df['rating'] = self.df['rating'].fillna(fill_value).astype(int)
-        
+
         # 5. 날짜 데이터 전처리 ('2017년 6월 11일' 형태를 'YYYY-MM-DD'로 표준화)
         if 'date' in self.df.columns:
             self.df['date'] = self.df['date'].astype(str)
@@ -61,8 +65,14 @@ class TripAdvisorProcessor(BaseDataProcessor):
             self.df['date'] = self.df['date'].str.strip() # 공백 제거
             
             self.df['date'] = pd.to_datetime(self.df['date'], errors='coerce')
-            self.df['date'] = self.df['date'].dt.strftime('%Y-%m-%d')
             self.df = self.df.dropna(subset=['date'])
+
+            # 이상치 처리: 너무 오래되거나(2000년 이전) 미래 날짜 제거
+            now = pd.Timestamp.now()
+            self.df = self.df[
+                (self.df['date'] >= pd.Timestamp('2000-01-01')) & (self.df['date'] <= now)
+            ]
+            self.df['date'] = self.df['date'].dt.strftime('%Y-%m-%d')
             
         return self.df
 
@@ -136,5 +146,5 @@ class TripAdvisorProcessor(BaseDataProcessor):
         """
         if self.df is not None:
             os.makedirs(self.output_dir, exist_ok=True)
-            output_file = os.path.join(self.output_dir, 'processed_reviews_TripAdvisor.csv')
+            output_file = os.path.join(self.output_dir, 'preprocessed_reviews_트립어드바이저.csv')
             self.df.to_csv(output_file, index=False, encoding='utf-8-sig')

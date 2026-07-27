@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 1. 구글맵 리뷰 파일 불러오기
-# (파일 이름이나 경로가 다르면 알맞게 수정해 줘!)
 df = pd.read_csv('processed_reviews_GoogleMaps.csv')
 
 # 2. 리뷰 길이(글자 수) 계산하기

@@ -64,6 +64,8 @@ python -m review_analysis.crawling.main -o database --all
 python -m mypy review_analysis utils
 ```
 
+# [4회차] EDA&FE, 시각화 과제
+
 ## 1. EDA
 
 ### 1.1 카카오맵 리뷰 분석
@@ -166,3 +168,110 @@ python -m mypy review_analysis utils
 2. ‘별표 n개’ 형태의 문자열 데이터를 'n' 형태의 int 데이터로 변환했다. 
 
 
+# [4회차] GitHub 협업과제
+
+## 1. 팀 소개
+저희 8조는 Web, 리뷰 데이터 크롤링, EDA 및 Feature Engineering 과제를 함께 수행했습니다. GitHub의 브랜치 보호 규칙과 Pull Request, 코드 리뷰 과정을 적용하여 협업을 진행했습니다.
+### 1.1 팀원 자기소개
+
+- 22학번 컴퓨터과학과 01년생 설승곤입니다.
+- 팀원 2:
+- 팀원 3:
+
+---
+
+## 2. GitHub 협업 과정
+
+### 2.1 Branch Protection Rule
+
+![브랜치 보호 규칙](github/branch_protection.png)
+
+### 2.2 Main 브랜치 Push 거부
+
+![Main 브랜치 Push 거부](github/push_rejected.png)
+
+### 2.3 Pull Request, Review 및 Merge
+
+![Pull Request Review 및 Merge](github/review_and_merged.png)
+
+---
+
+## 3. 과제 실행 방법
+
+### 3.1 패키지 설치
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 3.2 Web 과제 실행
+
+```bash
+uvicorn app.main:app --reload
+```
+
+```bash
+pytest
+```
+
+```bash
+mypy app/
+```
+
+### 3.3 크롤링 과제 실행
+
+#### 카카오맵
+
+```bash
+python -m review_analysis.crawling.main -o database -c kakao
+```
+
+#### 트립어드바이저
+
+```bash
+python -m review_analysis.crawling.main -o database -c tripadvisor
+```
+
+#### 구글맵
+
+```bash
+python -m review_analysis.crawling.main -o database -c googlemaps
+```
+
+#### 전체 크롤링
+
+```bash
+python -m review_analysis.crawling.main -o database --all
+```
+
+#### 타입 검사
+
+```bash
+python -m mypy review_analysis utils
+```
+
+### 3.4 EDA 실행
+
+#### 카카오맵
+
+```bash
+python review_analysis/plots/visual_kakao.py
+```
+
+#### 트립어드바이저
+
+```bash
+python review_analysis/plots/트립어드바이저_시각화파일명.py
+```
+
+#### 구글맵
+
+```bash
+python review_analysis/plots/구글맵_시각화파일명.py
+```
+
+### 3.5 전처리 및 Feature Engineering 실행
+
+```bash
+python -m review_analysis.preprocessing.main --output_dir database --all
+```

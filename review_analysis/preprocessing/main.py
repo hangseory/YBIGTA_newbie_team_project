@@ -2,7 +2,7 @@ import os
 import glob
 from argparse import ArgumentParser
 from typing import Dict, Type
-from base_processor import BaseDataProcessor
+from review_analysis.preprocessing.base_processor import BaseDataProcessor
 from googlemaps_processor import GoogleMapsProcessor
 from kakao_processor import KakaoMapProcessor
 from tripadvisor_processor import TripAdvisorProcessor

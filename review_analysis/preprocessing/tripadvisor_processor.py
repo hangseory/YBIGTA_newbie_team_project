@@ -4,7 +4,7 @@ import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 import joblib
 
-from base_processor import BaseDataProcessor 
+from review_analysis.preprocessing.base_processor import BaseDataProcessor 
 
 class TripAdvisorProcessor(BaseDataProcessor):
     """

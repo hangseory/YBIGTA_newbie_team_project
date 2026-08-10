@@ -326,3 +326,21 @@ python main.py --output_dir ../../database --all
 
 ## Docker Hub
 https://hub.docker.com/r/seoo0/ybigta-backend
+
+## aws 수행 사진
+![register](aws/register.png.png)
+![login](aws/login.png)
+![delete](aws/delete.png)
+![update-password](aws/update-password.png)
+![preprocessing](aws/preprocess.png)
+![github_action](aws/github_action.png)
+
+
+## RDS 퍼블릭 엑세스를 허용하지 않고, VPC를 활용하여 보안 설정하기
+
+![퍼블릭 엑세스 불가능](aws/RDS1.png)
+![인바운드 규칙 편집](aws/RDS2.png)
+
+
+
+

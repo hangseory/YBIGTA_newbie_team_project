@@ -223,3 +223,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AWS EC2 key pair / credentials
+*.pem
+
+# collector가 실행할 때마다 새로 만드는 임시 CSV 산출물
+collector/data/

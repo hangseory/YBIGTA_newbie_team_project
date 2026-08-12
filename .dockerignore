@@ -9,3 +9,4 @@ __pycache__
 test/
 *.log
 README.md
+*.pem

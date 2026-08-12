@@ -1,0 +1,15 @@
+[Unit]
+Description=YBIGTA KakaoMap review collector (one-shot run)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# TODO: 실제 EC2에 배포한 프로젝트 경로로 바꾸기
+WorkingDirectory=/home/ec2-user/YBIGTA_newbie_team_project
+EnvironmentFile=/home/ec2-user/YBIGTA_newbie_team_project/.env
+# webdriver-manager가 chromedriver 캐시를 ~/.wdm 에 저장하므로
+# systemd 환경에서도 HOME이 확실히 잡히도록 명시한다.
+Environment=HOME=/home/ec2-user
+ExecStart=/home/ec2-user/YBIGTA_newbie_team_project/.venv/bin/python -m collector.main
+User=ec2-user

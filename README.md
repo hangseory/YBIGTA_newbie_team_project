@@ -387,7 +387,84 @@ VPC (agent-vpc)
   - `mcp_user`: DB 전체에 대해 SELECT만 가능 (MCP 서버 전용, read-only)
 - 테이블/계정 정의는 [`collector/schema.sql`](collector/schema.sql)에서 확인 가능
 
+## 3. MCP
 
+> TODO: MCP 서버 담당 팀원 작성
 
+Agent가 사용할 수 있도록 아래 3개의 데이터 조회 Tool을 제공할 예정입니다.
+
+| Tool 이름 | 설명 | 파라미터 |
+|---|---|---|
+| `get_latest_reviews` | 가장 최근 작성된 리뷰 목록 조회 | `limit` (선택) |
+| `search_reviews` | 키워드 기반 리뷰 검색 (기간 필터 가능) | `keyword` (필수), `start_date`, `end_date`, `limit` (선택) |
+| `aggregate_ratings` | 특정 기간의 평균 별점 및 리뷰 개수 집계 | `start_date`, `end_date` (필수) |
+
+Raw SQL을 직접 실행하는 Tool은 만들지 않고, 파라미터를 제한된 형태로만 받아 안전성을 확보하는 방향으로 설계했습니다.
+
+## 4. MCP 보안
+
+> TODO: MCP 서버 담당 팀원 작성
+
+- MCP 요청에 `Authorization: Bearer <MCP_AUTH_TOKEN>` 인증을 적용합니다.
+- MCP가 사용하는 DB 계정(`mcp_user`)은 read-only 권한만 가집니다.
+- MCP 서버의 내부 포트를 인터넷에 직접 노출하지 않고 Reverse Proxy를 통해서만 접근 가능하도록 구성할 예정입니다.
+
+## 5. Data Analysis Agent
+
+Vercel + Next.js로 구현한 채팅 기반 Agent입니다. 사용자가 자연어로 질문하면, Agent가 MCP Tool을 스스로 선택해 호출하고 그 결과를 바탕으로 답변을 생성합니다.
+
+### 구조
+사용자 질문
+↓
+Agent (Google Gemini, Function Calling)
+↓
+MCP Tool 선택 (get_latest_reviews / search_reviews / aggregate_ratings)
+↓
+MCP Server 호출
+↓
+DB (kakao_reviews) 조회
+↓
+MCP Result → Agent
+↓
+Agent가 결과를 바탕으로 자연어 답변 생성
+
+Gemini의 Function Calling 기능을 사용해 사용자의 질문 의도를 분석하고, 필요한 MCP Tool을 스스로 선택해 호출합니다. 하나의 질문에 여러 번의 Tool 호출이 필요한 경우(예: 최신 데이터 확인 후 집계 계산)에도 최대 5턴까지 반복 호출을 지원하도록 구현했습니다.
+
+### 보안
+
+- LLM API Key(`GEMINI_API_KEY`), MCP 인증 토큰(`MCP_AUTH_TOKEN`) 등은 모두 서버 사이드(`app/api/chat/route.ts`)에서만 사용하며, `NEXT_PUBLIC_` 접두사를 사용하지 않아 Client Bundle에 노출되지 않습니다.
+- 브라우저(Client Component)는 MCP 서버 주소나 인증 토큰을 전혀 알지 못하며, MCP 호출은 반드시 Next.js 서버를 거칩니다.
+
+### 실행 방법
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+`http://localhost:3000` 에서 확인 가능합니다.
+
+환경변수는 `web/.env.example` 참고:
+
+```env
+GEMINI_API_KEY=
+MCP_SERVER_URL=
+MCP_AUTH_TOKEN=
+```
+
+## 6. Agent 동작 확인
+
+### 단순 조회
+
+> 질문: "가장 최근 리뷰 알려줘"
+> → `get_latest_reviews` Tool 호출 → 최근 리뷰 목록을 바탕으로 답변 생성
+
+### 분석/집계
+
+> 질문: "이번 주 평균 별점 알려줘"
+> → `aggregate_ratings(start_date, end_date)` Tool 호출 → 평균 별점과 리뷰 건수를 바탕으로 답변 생성
+
+(스크린샷: `aws/agent_query.png`, `aws/agent_analysis.png`)
 
 

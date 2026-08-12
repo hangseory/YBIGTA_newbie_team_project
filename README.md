@@ -341,6 +341,53 @@ https://hub.docker.com/r/seoo0/ybigta-backend
 ![퍼블릭 엑세스 불가능](aws/RDS1.png)
 ![인바운드 규칙 편집](aws/RDS2.png)
 
+# AI Agent
+
+## 1. 데이터 파이프라인
+
+### 1. 데이터 수집
+
+- 데이터: 카카오맵 경복궁 리뷰 (https://place.map.kakao.com/18619553#review)
+- 저장 컬럼: `rating`(별점), `review_date`(작성일, `YYYY-MM-DD`), `review`(리뷰 내용), `review_length`(리뷰 글자 수)
+- 시간 정보: `created_at`(최초 저장 시각), `updated_at`(마지막 수정 시각), `collected_at`(마지막으로 수집기가 이 리뷰를 확인한 시각)
+
+### 2. 수집 간격
+
+- **30분 간격**으로 자동 수집
+- 매 실행마다 최신 리뷰 최대 50개를 확인하며, 이미 저장된 리뷰(rating+날짜+내용 해시로 판별)는 새로 추가하지 않고 `collected_at`만 갱신. 새 리뷰만 새 행으로 추가
+- 최초 1회는 과거 리뷰까지 폭넓게 확보하기 위해 약 300여 개를 수동으로 수집.
+
+### 3. AWS 기능
+
+- **EC2**(Amazon Linux 2023, t3.small): `collector/` 코드를 systemd timer로 30분마다 자동 실행
+- **RDS(MySQL)**: 수집한 데이터 저장소, Private Subnet에 위치, Public Access 비활성화
+
+### 자동 갱신 증빙자료
+
+같은 EC2에서 자동으로 데이터가 수집되고 갱신된 것을 보여주는 캡처(16:26은 최초 데이터 저장 시각)
+
+- ![자동 갱신 증빙](aws/data_update.png) 
+
+30분동안 새로운 리뷰가 없어서 리뷰 건수는 같다.
+
+## 2. DB / VPC 구조
+
+```
+VPC (agent-vpc)
+├── Public Subnet
+│   └── EC2 (Security Group: mcp-sg) — collector 실행 + (추후) MCP Server
+└── Private Subnet
+    └── RDS MySQL: agentdb / reviewdb (Security Group: rds-sg)
+```
+
+- RDS는 **Public Access 비활성화** 상태로 Private Subnet에 위치해, 외부 인터넷에서 직접 접근 불가능
+- RDS Security Group(`rds-sg`)의 인바운드는 `3306 ← mcp-sg`로만 허용해, `mcp-sg`가 붙은 EC2를 통해서만 접근 가능
+- DB 계정을 역할별로 분리
+  - `collector_user`: `kakao_reviews` 테이블에 대해 SELECT/INSERT/UPDATE만 가능 (수집기 전용)
+  - `mcp_user`: DB 전체에 대해 SELECT만 가능 (MCP 서버 전용, read-only)
+- 테이블/계정 정의는 [`collector/schema.sql`](collector/schema.sql)에서 확인 가능
+
+
 
 
 

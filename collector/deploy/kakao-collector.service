@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# TODO: 실제 EC2에 배포한 프로젝트 경로로 바꿔주세요.
+# TODO: 실제 EC2에 배포한 프로젝트 경로로 바꾸기
 WorkingDirectory=/home/ec2-user/YBIGTA_newbie_team_project
 EnvironmentFile=/home/ec2-user/YBIGTA_newbie_team_project/.env
 # webdriver-manager가 chromedriver 캐시를 ~/.wdm 에 저장하므로

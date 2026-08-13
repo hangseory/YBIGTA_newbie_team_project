@@ -343,115 +343,206 @@ https://hub.docker.com/r/seoo0/ybigta-backend
 
 # AI Agent
 
-## 1. 데이터 파이프라인
+## 1. Architecture
 
-### 1. 데이터 수집
+![Architecture Diagram](aws/architecture.png)
 
-- 데이터: 카카오맵 경복궁 리뷰 (https://place.map.kakao.com/18619553#review)
-- 저장 컬럼: `rating`(별점), `review_date`(작성일, `YYYY-MM-DD`), `review`(리뷰 내용), `review_length`(리뷰 글자 수)
-- 시간 정보: `created_at`(최초 저장 시각), `updated_at`(마지막 수정 시각), `collected_at`(마지막으로 수집기가 이 리뷰를 확인한 시각)
+전체 시스템은 **KakaoMap → AWS Data Collector → RDS → MCP Server → Next.js/Vercel Agent → 사용자** 흐름으로 구성했습니다.
 
-### 2. 수집 간격
+- **데이터 수집:** KakaoMap → EC2 Data Collector → RDS MySQL (`INSERT / UPDATE`)
+- **Agent 질의:** 사용자 Browser → Vercel Next.js Agent → Nginx → MCP Server → RDS (`SELECT`)
+- **응답:** RDS → MCP Server → Next.js Agent(Gemini) → 사용자 Browser
 
-- **30분 간격**으로 자동 수집
-- 매 실행마다 최신 리뷰 최대 50개를 확인하며, 이미 저장된 리뷰(rating+날짜+내용 해시로 판별)는 새로 추가하지 않고 `collected_at`만 갱신. 새 리뷰만 새 행으로 추가
-- 최초 1회는 과거 리뷰까지 폭넓게 확보하기 위해 약 300여 개를 수동으로 수집.
+AWS VPC의 **Public Subnet**에는 Collector와 Docker 기반 MCP Server가 실행되는 EC2가 있으며, **Private Subnet**에는 RDS MySQL을 배치했습니다.  
+RDS는 `Publicly accessible = No`로 설정하여 외부 인터넷, Browser, Vercel에서 직접 접근할 수 없습니다. RDS Security Group의 MySQL 포트 `3306`은 EC2가 사용하는 Security Group에서 오는 요청만 허용합니다.
 
-### 3. AWS 기능
+![RDS Private 설정](aws/rds_private.png)
 
-- **EC2**(Amazon Linux 2023, t3.small): `collector/` 코드를 systemd timer로 30분마다 자동 실행
-- **RDS(MySQL)**: 수집한 데이터 저장소, Private Subnet에 위치, Public Access 비활성화
+![Security Group 설정](aws/security_group.png)
 
-### 자동 갱신 증빙자료
+---
 
-같은 EC2에서 자동으로 데이터가 수집되고 갱신된 것을 보여주는 캡처(16:26은 최초 데이터 저장 시각)
+## 2. Data Pipeline & DB
 
-- ![자동 갱신 증빙](aws/data_update.png) 
+수집 대상은 **카카오맵 경복궁 리뷰**이며, 별점, 작성일, 리뷰 본문과 리뷰 길이 등의 정보를 저장합니다.
 
-30분동안 새로운 리뷰가 없어서 리뷰 건수는 같다.
+EC2의 `collector/deploy/kakao-collector.timer`를 이용해 Collector를 **30분마다 자동 실행**합니다. 수집된 리뷰는 `rating + review_date + review`를 기준으로 생성한 SHA-256 해시로 중복을 식별합니다.
 
-## 2. DB / VPC 구조
+- 신규 리뷰: RDS에 새 행 추가
+- 기존 리뷰: 중복 저장하지 않고 `collected_at` 갱신
 
-```
-VPC (agent-vpc)
-├── Public Subnet
-│   └── EC2 (Security Group: mcp-sg) — collector 실행 + (추후) MCP Server
-└── Private Subnet
-    └── RDS MySQL: agentdb / reviewdb (Security Group: rds-sg)
-```
+![Collector 자동 갱신](aws/data_update.png)
 
-- RDS는 **Public Access 비활성화** 상태로 Private Subnet에 위치해, 외부 인터넷에서 직접 접근 불가능
-- RDS Security Group(`rds-sg`)의 인바운드는 `3306 ← mcp-sg`로만 허용해, `mcp-sg`가 붙은 EC2를 통해서만 접근 가능
-- DB 계정을 역할별로 분리
-  - `collector_user`: `kakao_reviews` 테이블에 대해 SELECT/INSERT/UPDATE만 가능 (수집기 전용)
-  - `mcp_user`: DB 전체에 대해 SELECT만 가능 (MCP 서버 전용, read-only)
-- 테이블/계정 정의는 [`collector/schema.sql`](collector/schema.sql)에서 확인 가능
+### DB Schema
 
-## 3. MCP
+RDS의 `reviewdb.kakao_reviews` 테이블은 다음과 같이 구성했습니다.
 
-AWS EC2에 MCP 서버를 배포하고, Agent가 RDS에 저장된 리뷰 데이터를 안전하게 조회할 수 있도록 3개의 Tool을 구현했습니다.
+| 컬럼 | 역할 |
+| --- | --- |
+| `id` | 자동 증가 Primary Key |
+| `rating` | 별점 |
+| `review_date` | 리뷰 작성일 |
+| `review` | 리뷰 본문 |
+| `review_length` | 리뷰 글자 수 |
+| `review_hash` | 중복 방지용 UNIQUE SHA-256 해시 |
+| `created_at` | 최초 저장 시각 |
+| `updated_at` | 마지막 수정 시각 |
+| `collected_at` | Collector가 마지막으로 확인한 시각 |
 
-| Tool 이름 | 설명 | 파라미터 |
+DB 계정은 최소 권한 원칙에 따라 역할별로 분리했습니다.
+
+| 계정 | 권한 | 용도 |
 | --- | --- | --- |
-| `get_latest_reviews` | 가장 최근 작성된 리뷰 목록 조회 | `limit` (선택) |
-| `search_reviews` | 키워드 기반 리뷰 검색 (기간 필터 가능) | `keyword` (필수), `start_date`, `end_date`, `limit` (선택) |
-| `aggregate_ratings` | 특정 기간의 평균 별점 및 리뷰 개수 집계 | `start_date`, `end_date` (필수) |
+| `collector_user` | SELECT / INSERT / UPDATE | Collector 전용 |
+| `mcp_user` | SELECT only | MCP Server 전용 |
 
-MCP 서버는 Docker 컨테이너로 EC2에서 실행되며, 각 Tool은 Service 및 Repository 계층을 통해 RDS의 리뷰 데이터를 조회합니다.
+자세한 DDL과 권한 설정은 [`collector/schema.sql`](collector/schema.sql)에서 확인할 수 있습니다.
 
-Raw SQL을 직접 입력받아 실행하는 Tool은 제공하지 않으며, 각 Tool이 허용된 파라미터만 입력받도록 구성하여 임의 SQL 실행을 방지했습니다.
+---
 
-MCP Inspector를 이용해 3개의 Tool이 정상적으로 등록되는 것을 확인했으며, 실제 Tool 호출을 통해 RDS의 리뷰 데이터가 반환되는 것까지 검증했습니다.
+## 3. MCP Server
 
+Agent가 RDS 데이터를 안전하게 조회할 수 있도록 AWS EC2에 MCP Server를 배포했습니다.
 
-## 4. MCP 보안
+### MCP Tools
 
-MCP 서버는 외부에서 직접 DB에 접근하지 않고, EC2에 배포된 MCP 서버를 통해서만 RDS의 데이터를 조회하도록 구성했습니다.
+| Tool | 역할 | 주요 파라미터 |
+| --- | --- | --- |
+| `get_latest_reviews` | 최신 리뷰 목록 조회 | `limit` |
+| `search_reviews` | 키워드 및 기간 기반 리뷰 검색 | `keyword`, `start_date`, `end_date`, `limit` |
+| `aggregate_ratings` | 기간별 리뷰 수 및 별점 통계 집계 | `start_date`, `end_date` |
 
-- MCP 요청에 `Authorization: Bearer <MCP_AUTH_TOKEN>` 인증을 적용했습니다.
-- MCP가 사용하는 DB 계정인 `mcp_user`는 조회 전용(read-only) 권한만 사용합니다.
-- RDS는 Private Subnet에 위치하며, 외부 인터넷에서 DB 포트로 직접 접근할 수 없도록 구성했습니다.
-- MCP 애플리케이션의 `8000` 포트는 EC2 내부의 `127.0.0.1`에만 바인딩했습니다.
-- 외부 요청은 Nginx Reverse Proxy의 `80` 포트를 통해 MCP 서버로 전달되도록 구성했습니다.
-- DB 비밀번호와 MCP 인증 토큰 등의 민감한 정보는 `.env` 파일로 관리하며 GitHub 및 Docker 이미지에 포함되지 않도록 설정했습니다.
+Raw SQL을 직접 입력받아 실행하는 Tool은 제공하지 않습니다. Agent가 실행할 수 있는 기능을 미리 정의된 Tool로 제한해 임의 SQL 실행, 데이터 수정·삭제, 과도한 조회를 방지했습니다.
 
-## 5. Data Analysis Agent
+### MCP 구조
 
-Vercel + Next.js로 구현한 채팅 기반 Agent입니다. 사용자가 자연어로 질문하면, Agent가 MCP Tool을 스스로 선택해 호출하고 그 결과를 바탕으로 답변을 생성합니다.
-
-### 구조
-사용자 질문
-↓
-Agent (Google Gemini, Function Calling)
-↓
-MCP Tool 선택 (get_latest_reviews / search_reviews / aggregate_ratings)
-↓
-MCP Server 호출
-↓
-DB (kakao_reviews) 조회
-↓
-MCP Result → Agent
-↓
-Agent가 결과를 바탕으로 자연어 답변 생성
-
-Gemini의 Function Calling 기능을 사용해 사용자의 질문 의도를 분석하고, 필요한 MCP Tool을 스스로 선택해 호출합니다. 하나의 질문에 여러 번의 Tool 호출이 필요한 경우(예: 최신 데이터 확인 후 집계 계산)에도 최대 5턴까지 반복 호출을 지원하도록 구현했습니다.
-
-### 보안
-
-- LLM API Key(`GEMINI_API_KEY`), MCP 인증 토큰(`MCP_AUTH_TOKEN`) 등은 모두 서버 사이드(`app/api/chat/route.ts`)에서만 사용하며, `NEXT_PUBLIC_` 접두사를 사용하지 않아 Client Bundle에 노출되지 않습니다.
-- 브라우저(Client Component)는 MCP 서버 주소나 인증 토큰을 전혀 알지 못하며, MCP 호출은 반드시 Next.js 서버를 거칩니다.
-
-### 실행 방법
-
-```bash
-cd web
-npm install
-npm run dev
+```text
+Tool
+ ↓
+Service
+ ↓
+Repository
+ ↓
+RDS
 ```
 
-`http://localhost:3000` 에서 확인 가능합니다.
+- **Tool:** Agent가 사용할 기능과 입력 스키마 정의
+- **Service:** 입력 검증과 조회 정책 처리
+- **Repository:** DB 연결 및 SQL Query 실행
 
-환경변수는 `web/.env.example` 참고:
+이렇게 계층을 분리하면 Tool 인터페이스를 유지하면서 DB 접근 방식이나 검색 구현을 변경하기 쉽고, 각 계층을 독립적으로 관리할 수 있습니다.
+
+새 Tool은 다음 순서로 확장할 수 있습니다.
+
+```text
+1. mcp_server/tools/ 에 Tool 추가
+2. Service에 입력 검증 및 처리 로직 추가
+3. Repository에 필요한 DB Query 추가
+4. server.py에서 Tool 등록
+```
+
+### 입력 검증 및 Query 제한
+
+MCP Server에는 다음 안전장치를 적용했습니다.
+
+- 조회 결과 `limit`: 1~20
+- 검색어 최대 100자
+- 날짜 형식 `YYYY-MM-DD` 검증
+- `start_date <= end_date` 검증
+- 허용된 컬럼과 필터만 사용
+- 사용자 입력값은 parameterized query의 `%s` 파라미터로 전달
+- DB 연결 및 Query timeout 적용
+- read-only `mcp_user` 사용
+- Raw SQL 입력 불가
+
+### MCP Inspector 증빙
+
+MCP Inspector를 통해 3개의 Tool이 정상 등록된 것을 확인했습니다.
+
+![MCP Inspector Tool 목록](aws/mcp_tools.png)
+
+실제 Tool 호출을 통해 RDS의 리뷰 데이터가 반환되는 것도 확인했습니다.
+
+![MCP Inspector Tool 호출](aws/mcp_call.png)
+
+---
+
+## 4. MCP 배포 및 보안
+
+MCP Server는 `mcp_server/Dockerfile`을 이용해 Docker 이미지로 빌드한 뒤 EC2에서 실행합니다.
+
+MCP 애플리케이션은 내부적으로 `8000` 포트를 사용하지만 인터넷에 직접 노출하지 않고, Docker의 host publish를 `127.0.0.1:8000:8000`으로 제한했습니다. 외부 요청은 Nginx의 `80` 포트를 통해 MCP Server로 전달됩니다.
+
+```text
+Internet
+   ↓
+Nginx :80
+   ↓
+127.0.0.1:8000
+   ↓
+MCP Server (Docker)
+```
+
+MCP 요청에는 Bearer Token 인증을 적용했습니다.
+
+```text
+Authorization: Bearer <MCP_AUTH_TOKEN>
+```
+
+또한 다음 민감 정보는 코드에 직접 작성하지 않고 환경변수로 관리합니다.
+
+```text
+GEMINI_API_KEY
+MCP_AUTH_TOKEN
+MCP_DB_PASSWORD
+DB Credential
+```
+
+`.env`, `*.pem` 등 민감 파일은 Git에 포함하지 않으며, 실제 Secret 값은 README에도 기록하지 않습니다.
+
+---
+
+## 5. Next.js Data Analysis Agent
+
+Frontend와 Agent는 Next.js로 구현하고 Vercel에 배포했습니다.
+
+Browser는 DB나 MCP Server를 직접 호출하지 않고 Next.js의 `POST /api/chat`만 호출합니다. Next.js Server Route Handler가 Gemini에 Tool 정보를 전달하고, Gemini Function Calling 결과에 따라 필요한 MCP Tool을 선택해 호출합니다.
+
+```text
+사용자 질문
+ ↓
+Browser
+ ↓
+Next.js Server (/api/chat)
+ ↓
+Gemini Function Calling
+ ↓
+MCP Tool 선택
+ ↓
+MCP Server
+ ↓
+RDS
+ ↓
+MCP Result
+ ↓
+Gemini
+ ↓
+최종 자연어 답변
+```
+
+데이터 조회는 반드시 다음 경로를 거칩니다.
+
+```text
+Browser → Next.js Server → MCP Server → RDS
+```
+
+따라서 Browser나 Vercel Frontend가 RDS에 직접 접근하지 않습니다.
+
+Gemini가 여러 Tool 호출이 필요하다고 판단하는 경우에도 무한 호출을 방지하기 위해 최대 호출 횟수를 제한했습니다.
+
+### 환경변수
+
+Vercel Server Side에서는 다음 환경변수를 사용합니다.
 
 ```env
 GEMINI_API_KEY=
@@ -459,18 +550,76 @@ MCP_SERVER_URL=
 MCP_AUTH_TOKEN=
 ```
 
-## 6. Agent 동작 확인
+Secret 값에는 `NEXT_PUBLIC_` 접두사를 사용하지 않아 Client Bundle에 노출되지 않도록 했습니다.
 
-### 단순 조회
+---
 
-> 질문: "가장 최근 리뷰 알려줘"
-> → `get_latest_reviews` Tool 호출 → 최근 리뷰 목록을 바탕으로 답변 생성
+## 6. Agent 동작 증빙
 
-### 분석/집계
+### 6.1 단순 조회
 
-> 질문: "이번 주 평균 별점 알려줘"
-> → `aggregate_ratings(start_date, end_date)` Tool 호출 → 평균 별점과 리뷰 건수를 바탕으로 답변 생성
+사용자가 최신 리뷰를 요청하면 Gemini가 `get_latest_reviews`를 선택하고 MCP Server를 통해 RDS의 실제 리뷰 데이터를 조회한 뒤 자연어로 정리합니다.
 
-(스크린샷: `aws/agent_query.png`, `aws/agent_analysis.png`)
+```text
+사용자 질문
+→ get_latest_reviews
+→ MCP Server
+→ RDS 최신 리뷰 조회
+→ Tool Result
+→ Gemini 최종 답변
+```
 
+![Agent 단순 조회](aws/agent_query.png)
 
+### 6.2 분석 / 집계
+
+기간별 평균 별점 등의 질문에서는 Gemini가 `aggregate_ratings`를 호출해 RDS의 리뷰를 집계하고 결과를 설명합니다.
+
+```text
+사용자 질문
+→ aggregate_ratings(start_date, end_date)
+→ MCP Server
+→ RDS 집계 Query
+→ 리뷰 개수 / 평균 별점 등 반환
+→ Gemini 최종 답변
+```
+
+![Agent 분석 및 집계](aws/agent_analysis.png)
+
+---
+
+## 7. 실행 방법
+
+### MCP Server
+
+```bash
+cd mcp_server
+pip install -r requirements.txt
+python server.py
+```
+
+Docker 실행:
+
+```bash
+docker build -t ybigta-mcp ./mcp_server
+
+docker run -d \
+  --name ybigta-mcp \
+  --env-file mcp_server/.env \
+  -p 127.0.0.1:8000:8000 \
+  ybigta-mcp
+```
+
+### Next.js Agent
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+로컬 실행 주소:
+
+```text
+http://localhost:3000
+```

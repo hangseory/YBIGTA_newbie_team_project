@@ -9,8 +9,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // ============================================================
 // MCP Tool 정의 (Gemini에게 "이런 도구를 쓸 수 있어"라고 알려주는 스펙)
-// 나중에 실제 MCP 서버가 준비되면 이 스펙은 그대로 두고
-// 아래 callMCPTool() 함수 내부만 실제 fetch 호출로 바꾸면 됩니다.
 // ============================================================
 const tools: FunctionDeclarationsTool[] = [
   {
@@ -80,6 +78,8 @@ const tools: FunctionDeclarationsTool[] = [
 
 // ============================================================
 // MCP 서버 호출 함수
+// MCP 서버는 web/app/api/chat/route.ts 와 바로 연결하기 위한
+// 호환 HTTP endpoint(/tools/{toolName})를 제공한다.
 // MCP_SERVER_URL이 설정되어 있으면 실제 MCP 서버를 호출하고,
 // 없으면 개발 중 테스트를 위한 mock 데이터를 반환한다.
 // ============================================================
@@ -96,13 +96,17 @@ async function callMCPTool(toolName: string, args: any) {
       },
       body: JSON.stringify(args),
     });
+
     if (!res.ok) {
-      throw new Error(`MCP 서버 오류: ${res.status}`);
+      const errorBody = await res.text();
+      console.error("MCP 서버 응답 상세:", errorBody);
+      throw new Error(`MCP 서버 오류: ${res.status} - ${errorBody}`);
     }
+
     return await res.json();
   }
 
-  // ---------- MCP 서버 준비 전 임시 Mock 데이터 ----------
+  // ---------- MCP 서버 없을 때 임시 Mock 데이터 ----------
   if (toolName === "get_latest_reviews") {
     return {
       reviews: [

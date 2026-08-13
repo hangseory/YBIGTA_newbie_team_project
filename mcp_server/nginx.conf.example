@@ -1,0 +1,17 @@
+# 예시: /etc/nginx/conf.d/mcp.conf
+# 외부에는 80/443만 열고, Docker의 8000은 EC2 내부에서만 접근하도록 구성하세요.
+server {
+    listen 80;
+    server_name YOUR_DOMAIN_OR_EC2_HOST;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Authorization $http_authorization;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+}

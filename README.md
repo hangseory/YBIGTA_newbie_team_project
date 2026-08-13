@@ -389,25 +389,31 @@ VPC (agent-vpc)
 
 ## 3. MCP
 
-> TODO: MCP 서버 담당 팀원 작성
-
-Agent가 사용할 수 있도록 아래 3개의 데이터 조회 Tool을 제공할 예정입니다.
+AWS EC2에 MCP 서버를 배포하고, Agent가 RDS에 저장된 리뷰 데이터를 안전하게 조회할 수 있도록 3개의 Tool을 구현했습니다.
 
 | Tool 이름 | 설명 | 파라미터 |
-|---|---|---|
+| --- | --- | --- |
 | `get_latest_reviews` | 가장 최근 작성된 리뷰 목록 조회 | `limit` (선택) |
 | `search_reviews` | 키워드 기반 리뷰 검색 (기간 필터 가능) | `keyword` (필수), `start_date`, `end_date`, `limit` (선택) |
 | `aggregate_ratings` | 특정 기간의 평균 별점 및 리뷰 개수 집계 | `start_date`, `end_date` (필수) |
 
-Raw SQL을 직접 실행하는 Tool은 만들지 않고, 파라미터를 제한된 형태로만 받아 안전성을 확보하는 방향으로 설계했습니다.
+MCP 서버는 Docker 컨테이너로 EC2에서 실행되며, 각 Tool은 Service 및 Repository 계층을 통해 RDS의 리뷰 데이터를 조회합니다.
+
+Raw SQL을 직접 입력받아 실행하는 Tool은 제공하지 않으며, 각 Tool이 허용된 파라미터만 입력받도록 구성하여 임의 SQL 실행을 방지했습니다.
+
+MCP Inspector를 이용해 3개의 Tool이 정상적으로 등록되는 것을 확인했으며, 실제 Tool 호출을 통해 RDS의 리뷰 데이터가 반환되는 것까지 검증했습니다.
+
 
 ## 4. MCP 보안
 
-> TODO: MCP 서버 담당 팀원 작성
+MCP 서버는 외부에서 직접 DB에 접근하지 않고, EC2에 배포된 MCP 서버를 통해서만 RDS의 데이터를 조회하도록 구성했습니다.
 
-- MCP 요청에 `Authorization: Bearer <MCP_AUTH_TOKEN>` 인증을 적용합니다.
-- MCP가 사용하는 DB 계정(`mcp_user`)은 read-only 권한만 가집니다.
-- MCP 서버의 내부 포트를 인터넷에 직접 노출하지 않고 Reverse Proxy를 통해서만 접근 가능하도록 구성할 예정입니다.
+- MCP 요청에 `Authorization: Bearer <MCP_AUTH_TOKEN>` 인증을 적용했습니다.
+- MCP가 사용하는 DB 계정인 `mcp_user`는 조회 전용(read-only) 권한만 사용합니다.
+- RDS는 Private Subnet에 위치하며, 외부 인터넷에서 DB 포트로 직접 접근할 수 없도록 구성했습니다.
+- MCP 애플리케이션의 `8000` 포트는 EC2 내부의 `127.0.0.1`에만 바인딩했습니다.
+- 외부 요청은 Nginx Reverse Proxy의 `80` 포트를 통해 MCP 서버로 전달되도록 구성했습니다.
+- DB 비밀번호와 MCP 인증 토큰 등의 민감한 정보는 `.env` 파일로 관리하며 GitHub 및 Docker 이미지에 포함되지 않도록 설정했습니다.
 
 ## 5. Data Analysis Agent
 
